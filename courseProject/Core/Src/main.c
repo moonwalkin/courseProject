@@ -22,6 +22,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "lcd.h"
+#include "dth22.h"
 #include "structures.h"
 /* USER CODE END Includes */
 
@@ -32,11 +33,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define T "Temperature"
-#define H "Humidity"
-#define AVG_T "AVG Temp: "
-#define AVG_H "AVG Hum: "
-#define ARRAY_SIZE 20
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -50,7 +47,7 @@ I2C_HandleTypeDef hi2c1;
 TIM_HandleTypeDef htim2;
 
 /* USER CODE BEGIN PV */
-
+uint32_t pMillis, cMillis;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -64,10 +61,7 @@ static void MX_TIM2_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-void microDelay (uint16_t delay) {
-  __HAL_TIM_SET_COUNTER(&htim2, 0);
-  while (__HAL_TIM_GET_COUNTER(&htim2) < delay);
-}
+
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 
@@ -75,6 +69,61 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 
+}
+
+void microDelay(uint16_t delay) {
+  __HAL_TIM_SET_COUNTER(&htim2, 0);
+  while(__HAL_TIM_GET_COUNTER(&htim2) < delay);
+}
+
+uint8_t read() {
+	uint8_t result;
+	for(uint8_t i = 0; i < 8; i++) {
+		pMillis = HAL_GetTick();
+		cMillis = HAL_GetTick();
+		while(!(HAL_GPIO_ReadPin(GPIOC, DTH22_Pin)) && pMillis + 2 > cMillis) {
+			cMillis = HAL_GetTick();
+		}
+		microDelay(40);
+		if (!(HAL_GPIO_ReadPin(GPIOC, DTH22_Pin)))
+			result&= ~(1 << (7 - i));
+		else
+			result|= (1 << (7 - i));
+		pMillis = HAL_GetTick();
+		cMillis = HAL_GetTick();
+		while((HAL_GPIO_ReadPin(GPIOC, DTH22_Pin)) && pMillis + 2 > cMillis) {
+		  cMillis = HAL_GetTick();
+		}
+	}
+	return result;
+}
+
+uint8_t start() {
+	uint8_t Response = 0;
+	GPIO_InitTypeDef GPIO_InitStructPrivate = {0};
+	GPIO_InitStructPrivate.Pin = DTH22_Pin;
+	GPIO_InitStructPrivate.Mode = GPIO_MODE_OUTPUT_PP;
+	GPIO_InitStructPrivate.Speed = GPIO_SPEED_FREQ_LOW;
+	GPIO_InitStructPrivate.Pull = GPIO_NOPULL;
+	HAL_GPIO_Init(GPIOC, &GPIO_InitStructPrivate);
+	HAL_GPIO_WritePin (GPIOC, DTH22_Pin, 0);
+	microDelay(1300);
+	HAL_GPIO_WritePin (GPIOC, DTH22_Pin, 1);
+	microDelay(30);
+	GPIO_InitStructPrivate.Mode = GPIO_MODE_INPUT;
+	GPIO_InitStructPrivate.Pull = GPIO_PULLUP;
+	HAL_GPIO_Init(GPIOC, &GPIO_InitStructPrivate);
+	microDelay (40);
+	if(!(HAL_GPIO_ReadPin(GPIOC, DTH22_Pin))) {
+		microDelay (80);
+    if ((HAL_GPIO_ReadPin(GPIOC, DTH22_Pin))) Response = 1;
+	}
+	pMillis = HAL_GetTick();
+	cMillis = HAL_GetTick();
+	while((HAL_GPIO_ReadPin(GPIOC, DTH22_Pin)) && pMillis + 2 > cMillis) {
+		cMillis = HAL_GetTick();
+	}
+	return Response;
 }
 
 /* USER CODE END 0 */
@@ -235,15 +284,14 @@ static void MX_TIM2_Init(void)
 
   TIM_ClockConfigTypeDef sClockSourceConfig = {0};
   TIM_MasterConfigTypeDef sMasterConfig = {0};
-  TIM_OC_InitTypeDef sConfigOC = {0};
 
   /* USER CODE BEGIN TIM2_Init 1 */
 
   /* USER CODE END TIM2_Init 1 */
   htim2.Instance = TIM2;
-  htim2.Init.Prescaler = 71;
+  htim2.Init.Prescaler = 599;
   htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim2.Init.Period = 18000000;
+  htim2.Init.Period = 3600000;
   htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
@@ -255,28 +303,15 @@ static void MX_TIM2_Init(void)
   {
     Error_Handler();
   }
-  if (HAL_TIM_PWM_Init(&htim2) != HAL_OK)
-  {
-    Error_Handler();
-  }
   sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
   sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
   if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
   {
     Error_Handler();
   }
-  sConfigOC.OCMode = TIM_OCMODE_PWM1;
-  sConfigOC.Pulse = 0;
-  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
-  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
-  if (HAL_TIM_PWM_ConfigChannel(&htim2, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
-  {
-    Error_Handler();
-  }
   /* USER CODE BEGIN TIM2_Init 2 */
 
   /* USER CODE END TIM2_Init 2 */
-  HAL_TIM_MspPostInit(&htim2);
 
 }
 
