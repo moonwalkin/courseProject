@@ -9,3 +9,5 @@ void lcdSendData(char data);
 void lcdSendString(char *str);
 
 void lcdPutCur(int row, int col);
+
+void lcdClear();

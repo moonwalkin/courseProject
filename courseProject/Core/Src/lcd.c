@@ -75,3 +75,10 @@ void lcdSendString(char *str)
 {
 	while (*str) lcdSendData(*str++);
 }
+
+void lcdClear() {
+	lcdSendCmd (0x80);
+	for (int i=0; i<70; i++) {
+		lcdSendData (' ');
+	}
+}
