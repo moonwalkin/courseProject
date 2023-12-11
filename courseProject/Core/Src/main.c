@@ -62,13 +62,13 @@ static void MX_TIM2_Init(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
-int a = 0;
+
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 
 }
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
-	a++;
+
 }
 
 void microDelay(uint16_t delay) {
