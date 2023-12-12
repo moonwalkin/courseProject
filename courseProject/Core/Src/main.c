@@ -44,6 +44,7 @@
 /* Private variables ---------------------------------------------------------*/
 I2C_HandleTypeDef hi2c1;
 
+TIM_HandleTypeDef htim1;
 TIM_HandleTypeDef htim2;
 
 /* USER CODE BEGIN PV */
@@ -55,6 +56,7 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_I2C1_Init(void);
 static void MX_TIM2_Init(void);
+static void MX_TIM1_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -71,9 +73,62 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 
 }
 
+void showOnDisplay(struct Measurements m, char* tmpBuffer, char* tmpText, char* humBuffer, char* humText) {
+	lcdPutCur(0, 0);
+	lcdSendString(tmpText);
+	sprintf(tmpBuffer, "%.2f", m.temperature);
+	lcdSendString(tmpBuffer);
+	lcdPutCur(1, 0);
+	lcdSendString(humText);
+	sprintf(humBuffer, "%.2f", m.humidity);
+	lcdSendString(humBuffer);
+}
+
+void showCurrent() {
+	char tmpBuffer[10];
+	char humBuffer[10];
+
+	showOnDisplay(
+		measurements,
+		tmpBuffer,
+		"Temp: ",
+		humBuffer,
+		"Humidity: "
+	);
+
+	measure();
+}
+
+void measure() {
+	uint8_t firstPartHum = 0;
+	uint8_t secondPartHum = 0;
+	uint8_t firstPartTemp = 0;
+	uint8_t secondPartTemp = 0;
+	uint8_t check = 0;
+	uint16_t sum = 0;
+
+	if (start()) {
+		firstPartHum = read();
+		secondPartHum = read();
+		firstPartTemp = read();
+		secondPartTemp = read();
+		sum = read();
+		check = firstPartHum + secondPartHum + firstPartTemp + secondPartTemp;
+		if (check == sum) {
+			if (firstPartTemp > 127) {
+				measurements.temperature = (float)secondPartTemp / 10 * (-1);
+			}
+			else {
+				measurements.temperature = (float)((firstPartTemp << 8) | secondPartTemp) / 10;
+			}
+			measurements.humidity = (float)((firstPartHum << 8) | secondPartHum) / 10;
+		}
+	}
+}
+
 void microDelay(uint16_t delay) {
-  __HAL_TIM_SET_COUNTER(&htim2, 0);
-  while(__HAL_TIM_GET_COUNTER(&htim2) < delay);
+  __HAL_TIM_SET_COUNTER(&htim1, 0);
+  while(__HAL_TIM_GET_COUNTER(&htim1) < delay);
 }
 
 uint8_t read() {
@@ -158,10 +213,11 @@ int main(void)
   MX_GPIO_Init();
   MX_I2C1_Init();
   MX_TIM2_Init();
+  MX_TIM1_Init();
   /* USER CODE BEGIN 2 */
   lcdInit();
+  HAL_TIM_Base_Start(&htim1);
   HAL_TIM_Base_Start_IT(&htim2);
-
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -170,7 +226,7 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-
+	  showCurrent();
   }
   /* USER CODE END 3 */
 }
@@ -213,8 +269,10 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
-  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_I2C1|RCC_PERIPHCLK_TIM2;
+  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_I2C1|RCC_PERIPHCLK_TIM1
+                              |RCC_PERIPHCLK_TIM2;
   PeriphClkInit.I2c1ClockSelection = RCC_I2C1CLKSOURCE_HSI;
+  PeriphClkInit.Tim1ClockSelection = RCC_TIM1CLK_HCLK;
   PeriphClkInit.Tim2ClockSelection = RCC_TIM2CLK_HCLK;
   if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
   {
@@ -271,6 +329,53 @@ static void MX_I2C1_Init(void)
 }
 
 /**
+  * @brief TIM1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM1_Init(void)
+{
+
+  /* USER CODE BEGIN TIM1_Init 0 */
+
+  /* USER CODE END TIM1_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM1_Init 1 */
+
+  /* USER CODE END TIM1_Init 1 */
+  htim1.Instance = TIM1;
+  htim1.Init.Prescaler = 71;
+  htim1.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim1.Init.Period = 65535;
+  htim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim1.Init.RepetitionCounter = 0;
+  htim1.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim1, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterOutputTrigger2 = TIM_TRGO2_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim1, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM1_Init 2 */
+
+  /* USER CODE END TIM1_Init 2 */
+
+}
+
+/**
   * @brief TIM2 Initialization Function
   * @param None
   * @retval None
@@ -291,7 +396,7 @@ static void MX_TIM2_Init(void)
   htim2.Instance = TIM2;
   htim2.Init.Prescaler = 599;
   htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim2.Init.Period = 3600000;
+  htim2.Init.Period = 3599999;
   htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim2) != HAL_OK)

@@ -8,9 +8,16 @@
 #ifndef INC_STRUCTURES_H_
 #define INC_STRUCTURES_H_
 
-struct {
+struct Measurements {
 	float temperature;
 	float humidity;
 } measurements = {0.0, 0.0};
+
+typedef enum {
+	currentMeasurements,
+	maxMeasurements,
+	minMeasurements,
+	avgMeasurements,
+} mode;
 
 #endif /* INC_STRUCTURES_H_ */
