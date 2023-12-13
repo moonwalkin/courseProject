@@ -18,17 +18,17 @@ typedef enum {
 	maxMeasurements,
 	minMeasurements,
 	avgMeasurements,
-} mode;
+} Mode;
 
 struct State {
-	int timesClicked;
+	uint8_t timesClicked;
 } buttonState = {1};
 
-typedef struct Mesure{
+typedef struct Mesure {
 	float avg;
 	float max;
 	float min;
 	float sum;
-} M;
+} Mesure;
 
 #endif /* INC_STRUCTURES_H_ */

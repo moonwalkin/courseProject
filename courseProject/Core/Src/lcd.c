@@ -3,8 +3,7 @@ extern I2C_HandleTypeDef hi2c1;
 
 #define SLAVE_ADDRESS_LCD 0x7E
 
-void lcdSendCmd(char cmd)
-{
+void lcdSendCmd(char cmd) {
   char data_u, data_l;
 	uint8_t data_t[4];
 	data_u = (cmd&0xf0);
@@ -16,8 +15,7 @@ void lcdSendCmd(char cmd)
 	HAL_I2C_Master_Transmit (&hi2c1, SLAVE_ADDRESS_LCD,(uint8_t *) data_t, 4, 100);
 }
 
-void lcdSendData(char data)
-{
+void lcdSendData(char data) {
 	char data_u, data_l;
 	uint8_t data_t[4];
 	data_u = (data&0xf0);
@@ -30,8 +28,7 @@ void lcdSendData(char data)
 }
 
 
-void lcdPutCur(int row, int col)
-{
+void lcdPutCur(int row, int col) {
     switch (row)
     {
         case 0:
@@ -46,8 +43,7 @@ void lcdPutCur(int row, int col)
 }
 
 
-void lcdInit()
-{
+void lcdInit() {
 	HAL_Delay(50);
 	lcdSendCmd(0x30);
 	HAL_Delay(5);
@@ -71,14 +67,11 @@ void lcdInit()
 	lcdSendCmd(0x0C);
 }
 
-void lcdSendString(char *str)
-{
-	while (*str) lcdSendData(*str++);
+void lcdSendString(char *str) {
+	while(*str)lcdSendData(*str++);
 }
 
 void lcdClear() {
-	lcdSendCmd (0x80);
-	for (int i=0; i<70; i++) {
-		lcdSendData (' ');
-	}
+	lcdSendCmd(0x01);
+    HAL_Delay(10);
 }
