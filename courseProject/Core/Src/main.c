@@ -24,6 +24,7 @@
 #include "lcd.h"
 #include "dth22.h"
 #include "structures.h"
+#include "scheduler.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -33,7 +34,9 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+#define TRUE 1
+#define FALSE 0
+#define ARRAY_SIZE 20
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -49,6 +52,13 @@ TIM_HandleTypeDef htim2;
 
 /* USER CODE BEGIN PV */
 uint32_t pMillis, cMillis;
+float temps[ARRAY_SIZE];
+float humidities[ARRAY_SIZE];
+uint8_t currentIndex = 0;
+uint8_t shouldClear = FALSE;
+Mode mode = currentMeasurements;
+Mesure temperature = {0, 0, 0, 0};
+Mesure humidity = {0, 0, 0, 0};
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -63,40 +73,129 @@ static void MX_TIM1_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-
-
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
-
+	shouldClear = TRUE;
+	buttonState.timesClicked = (buttonState.timesClicked + 1) % 4;
+	if (buttonState.timesClicked == 0) {
+		mode = currentMeasurements;
+	} else if (buttonState.timesClicked == 1) {
+		mode = maxMeasurements;
+	} else if (buttonState.timesClicked == 2) {
+		mode = minMeasurements;
+	} else {
+		mode = avgMeasurements;
+	}
 }
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
-
+	if (htim == &htim2)
+		if (currentIndex > 0) {
+			temps[currentIndex] = measurements.temperature;
+			humidities[currentIndex] = measurements.humidity;
+			currentIndex = (currentIndex + 1) % 20;
+		}
 }
 
-void showOnDisplay(struct Measurements m, char* tmpBuffer, char* tmpText, char* humBuffer, char* humText) {
+
+
+void calculateMaxAndMin() {
+	temperature.max = temps[0];
+	temperature.min = temps[0];
+	temperature.sum = temps[0];
+
+	humidity.max = humidities[0];
+	humidity.sum = humidities[0];
+	humidity.min = humidities[0];
+
+	for(int i = 1; i < currentIndex; i++) {
+		temperature.sum += temps[i];
+		humidity.sum += humidities[i];
+		if (temps[i] < temperature.min) {
+			temperature.min = temps[i];
+		}
+		if (temps[i] > temperature.max) {
+			temperature.max = temps[i];
+		}
+		if (humidities[i] > humidity.max) {
+			humidity.max = humidities[i];
+		}
+		if (humidities[i] < humidity.min) {
+			humidity.min = humidities[i];
+		}
+	}
+	temperature.avg = temperature.sum / currentIndex;
+	humidity.avg = humidity.sum / currentIndex;
+}
+
+void showOnDisplay(float temp, float hum, char* tmpBuffer, char* tmpText, char* humBuffer, char* humText) {
 	lcdPutCur(0, 0);
 	lcdSendString(tmpText);
-	sprintf(tmpBuffer, "%.2f", m.temperature);
+	sprintf(tmpBuffer, "%.2f", temp);
 	lcdSendString(tmpBuffer);
 	lcdPutCur(1, 0);
 	lcdSendString(humText);
-	sprintf(humBuffer, "%.2f", m.humidity);
+	sprintf(humBuffer, "%.2f", hum);
 	lcdSendString(humBuffer);
+}
+
+void showMin() {
+	char tmpBuffer[10];
+	char humBuffer[10];
+
+	showOnDisplay(
+		temperature.min,
+		humidity.min,
+		tmpBuffer,
+		"Min temp: ",
+		humBuffer,
+		"Min hum: "
+	);
+	calculateMaxAndMin();
+}
+
+void showMax() {
+	char tmpBuffer[10];
+	char humBuffer[10];
+
+	showOnDisplay(
+		temperature.max,
+		humidity.max,
+		tmpBuffer,
+		"Max temp: ",
+		humBuffer,
+		"Max hum: "
+	);
+	calculateMaxAndMin();
+}
+
+void showAvg() {
+	char tmpBuffer[10];
+	char humBuffer[10];
+
+	showOnDisplay(
+		temperature.avg,
+		humidity.avg,
+		tmpBuffer,
+		"Avg temp: ",
+		humBuffer,
+		"Avg hum: "
+	);
+	calculateMaxAndMin();
 }
 
 void showCurrent() {
 	char tmpBuffer[10];
 	char humBuffer[10];
 
+	measure();
 	showOnDisplay(
-		measurements,
+		measurements.temperature,
+		measurements.humidity,
 		tmpBuffer,
 		"Temp: ",
 		humBuffer,
 		"Humidity: "
 	);
-
-	measure();
 }
 
 void measure() {
@@ -122,13 +221,19 @@ void measure() {
 				measurements.temperature = (float)((firstPartTemp << 8) | secondPartTemp) / 10;
 			}
 			measurements.humidity = (float)((firstPartHum << 8) | secondPartHum) / 10;
+
+			if (currentIndex == 0) {
+				temps[currentIndex] = measurements.temperature;
+				humidities[currentIndex] = measurements.humidity;
+				currentIndex++;
+			}
 		}
 	}
 }
 
 void microDelay(uint16_t delay) {
-  __HAL_TIM_SET_COUNTER(&htim1, 0);
-  while(__HAL_TIM_GET_COUNTER(&htim1) < delay);
+	__HAL_TIM_SET_COUNTER(&htim1, 0);
+	while(__HAL_TIM_GET_COUNTER(&htim1) < delay);
 }
 
 uint8_t read() {
@@ -154,7 +259,7 @@ uint8_t read() {
 }
 
 uint8_t start() {
-	uint8_t Response = 0;
+	uint8_t response = 0;
 	GPIO_InitTypeDef GPIO_InitStructPrivate = {0};
 	GPIO_InitStructPrivate.Pin = DTH22_Pin;
 	GPIO_InitStructPrivate.Mode = GPIO_MODE_OUTPUT_PP;
@@ -171,14 +276,14 @@ uint8_t start() {
 	microDelay (40);
 	if(!(HAL_GPIO_ReadPin(GPIOC, DTH22_Pin))) {
 		microDelay (80);
-    if ((HAL_GPIO_ReadPin(GPIOC, DTH22_Pin))) Response = 1;
+    if ((HAL_GPIO_ReadPin(GPIOC, DTH22_Pin))) response = 1;
 	}
 	pMillis = HAL_GetTick();
 	cMillis = HAL_GetTick();
 	while((HAL_GPIO_ReadPin(GPIOC, DTH22_Pin)) && pMillis + 2 > cMillis) {
 		cMillis = HAL_GetTick();
 	}
-	return Response;
+	return response;
 }
 
 /* USER CODE END 0 */
@@ -216,8 +321,9 @@ int main(void)
   MX_TIM1_Init();
   /* USER CODE BEGIN 2 */
   lcdInit();
+  InitScheduler();
   HAL_TIM_Base_Start(&htim1);
-  HAL_TIM_Base_Start_IT(&htim2);
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -226,7 +332,22 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	  showCurrent();
+	  if (shouldClear) {
+		  lcdClear();
+		  shouldClear = FALSE;
+	  }
+
+	  if (mode == currentMeasurements) {
+		  SetTask(showCurrent);
+	  } else if (mode == maxMeasurements) {
+		  SetTask(showMax);
+	  } else if (mode == minMeasurements) {
+		  SetTask(showMin);
+	  } else {
+		  SetTask(showAvg);
+	  }
+
+	  TaskManager();
   }
   /* USER CODE END 3 */
 }

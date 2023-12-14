@@ -28,6 +28,7 @@ extern "C" {
 
 /* Includes ------------------------------------------------------------------*/
 #include "stm32f3xx_hal.h"
+
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 
@@ -54,6 +55,11 @@ void Error_Handler(void);
 /* USER CODE BEGIN EFP */
 void measure();
 void showCurrent();
+void showMin();
+void showMax();
+void showAvg();
+void calculateMinMax();
+void showOnDisplay(float temp, float hum, char* tmpBuffer, char* tmpText, char* humBuffer, char* humText);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
