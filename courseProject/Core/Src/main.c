@@ -24,6 +24,7 @@
 #include "lcd.h"
 #include "dth22.h"
 #include "structures.h"
+#include "scheduler.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -72,15 +73,14 @@ static void MX_TIM1_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 	shouldClear = TRUE;
-	buttonState.timesClicked = (buttonState.timesClicked % 4) + 1;
-	if (buttonState.timesClicked == 1) {
+	buttonState.timesClicked = (buttonState.timesClicked + 1) % 4;
+	if (buttonState.timesClicked == 0) {
 		mode = currentMeasurements;
-	} else if (buttonState.timesClicked == 2) {
+	} else if (buttonState.timesClicked == 1) {
 		mode = maxMeasurements;
-	} else if (buttonState.timesClicked == 3) {
+	} else if (buttonState.timesClicked == 2) {
 		mode = minMeasurements;
 	} else {
 		mode = avgMeasurements;
@@ -92,7 +92,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 		if (currentIndex > 0) {
 			temps[currentIndex] = measurements.temperature;
 			humidities[currentIndex] = measurements.humidity;
-			currentIndex = (currentIndex + 1) % 21;
+			currentIndex = (currentIndex + 1) % 20;
 		}
 }
 
@@ -188,7 +188,6 @@ void showCurrent() {
 	char humBuffer[10];
 
 	measure();
-
 	showOnDisplay(
 		measurements.temperature,
 		measurements.humidity,
@@ -322,8 +321,9 @@ int main(void)
   MX_TIM1_Init();
   /* USER CODE BEGIN 2 */
   lcdInit();
+  InitScheduler();
   HAL_TIM_Base_Start(&htim1);
-  HAL_TIM_Base_Start_IT(&htim2);
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -338,14 +338,16 @@ int main(void)
 	  }
 
 	  if (mode == currentMeasurements) {
-		  showCurrent();
+		  SetTask(showCurrent);
 	  } else if (mode == maxMeasurements) {
-		  showMax();
+		  SetTask(showMax);
 	  } else if (mode == minMeasurements) {
-		  showMin();
+		  SetTask(showMin);
 	  } else {
-		  showAvg();
+		  SetTask(showAvg);
 	  }
+
+	  TaskManager();
   }
   /* USER CODE END 3 */
 }

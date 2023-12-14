@@ -22,7 +22,7 @@ typedef enum {
 
 struct State {
 	uint8_t timesClicked;
-} buttonState = {1};
+} buttonState = {0};
 
 typedef struct Mesure {
 	float avg;
