@@ -55,7 +55,6 @@ uint32_t pMillis, cMillis;
 float temps[ARRAY_SIZE];
 float humidities[ARRAY_SIZE];
 uint8_t currentIndex = 0;
-Mode mode = currentMeasurements;
 Mesure temperature = {0, 0, 0, 0};
 Mesure humidity = {0, 0, 0, 0};
 /* USER CODE END PV */
@@ -87,19 +86,9 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 	if (htim == &htim2) {
-				SetTask(measure);
-
-				if (currentIndex > 0) {
-					temps[currentIndex] = measurements.temperature;
-					humidities[currentIndex] = measurements.humidity;
-					currentIndex = (currentIndex + 1) % 20;
-
-				}
+		SetTask(measure);
 	}
-
 }
-
-
 
 void calculateMaxAndMin() {
 	temperature.max = temps[0];
@@ -225,10 +214,11 @@ void measure() {
 			}
 			measurements.humidity = (float)((firstPartHum << 8) | secondPartHum) / 10;
 
-			if (currentIndex == 0) {
-				temps[currentIndex] = measurements.temperature;
-				humidities[currentIndex] = measurements.humidity;
-				currentIndex++;
+			temps[currentIndex] = measurements.temperature;
+			humidities[currentIndex] = measurements.humidity;
+			currentIndex = (currentIndex + 1) % 20;
+
+			if (buttonState.timesClicked == 0) {
 				SetTask(showCurrent);
 			}
 		}
