@@ -55,7 +55,6 @@ uint32_t pMillis, cMillis;
 float temps[ARRAY_SIZE];
 float humidities[ARRAY_SIZE];
 uint8_t currentIndex = 0;
-uint8_t shouldClear = FALSE;
 Mode mode = currentMeasurements;
 Mesure temperature = {0, 0, 0, 0};
 Mesure humidity = {0, 0, 0, 0};
@@ -74,26 +73,30 @@ static void MX_TIM1_Init(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
-	shouldClear = TRUE;
 	buttonState.timesClicked = (buttonState.timesClicked + 1) % 4;
 	if (buttonState.timesClicked == 0) {
-		mode = currentMeasurements;
+		SetTask(showCurrent);
 	} else if (buttonState.timesClicked == 1) {
-		mode = maxMeasurements;
+		SetTask(showMax);
 	} else if (buttonState.timesClicked == 2) {
-		mode = minMeasurements;
+		SetTask(showMin);
 	} else {
-		mode = avgMeasurements;
+		SetTask(showAvg);
 	}
 }
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
-	if (htim == &htim2)
-		if (currentIndex > 0) {
-			temps[currentIndex] = measurements.temperature;
-			humidities[currentIndex] = measurements.humidity;
-			currentIndex = (currentIndex + 1) % 20;
-		}
+	if (htim == &htim2) {
+				SetTask(measure);
+
+				if (currentIndex > 0) {
+					temps[currentIndex] = measurements.temperature;
+					humidities[currentIndex] = measurements.humidity;
+					currentIndex = (currentIndex + 1) % 20;
+
+				}
+	}
+
 }
 
 
@@ -141,7 +144,8 @@ void showOnDisplay(float temp, float hum, char* tmpBuffer, char* tmpText, char* 
 void showMin() {
 	char tmpBuffer[10];
 	char humBuffer[10];
-
+	lcdClear();
+	calculateMaxAndMin();
 	showOnDisplay(
 		temperature.min,
 		humidity.min,
@@ -150,13 +154,14 @@ void showMin() {
 		humBuffer,
 		"Min hum: "
 	);
-	calculateMaxAndMin();
+
 }
 
 void showMax() {
 	char tmpBuffer[10];
 	char humBuffer[10];
-
+	lcdClear();
+	calculateMaxAndMin();
 	showOnDisplay(
 		temperature.max,
 		humidity.max,
@@ -165,13 +170,13 @@ void showMax() {
 		humBuffer,
 		"Max hum: "
 	);
-	calculateMaxAndMin();
 }
 
 void showAvg() {
 	char tmpBuffer[10];
 	char humBuffer[10];
-
+	lcdClear();
+	calculateMaxAndMin();
 	showOnDisplay(
 		temperature.avg,
 		humidity.avg,
@@ -180,14 +185,12 @@ void showAvg() {
 		humBuffer,
 		"Avg hum: "
 	);
-	calculateMaxAndMin();
 }
 
 void showCurrent() {
 	char tmpBuffer[10];
 	char humBuffer[10];
-
-	measure();
+	lcdClear();
 	showOnDisplay(
 		measurements.temperature,
 		measurements.humidity,
@@ -226,6 +229,7 @@ void measure() {
 				temps[currentIndex] = measurements.temperature;
 				humidities[currentIndex] = measurements.humidity;
 				currentIndex++;
+				SetTask(showCurrent);
 			}
 		}
 	}
@@ -322,8 +326,10 @@ int main(void)
   /* USER CODE BEGIN 2 */
   lcdInit();
   InitScheduler();
-  HAL_TIM_Base_Start(&htim1);
+  SetTask(measure);
 
+  HAL_TIM_Base_Start(&htim1);
+  HAL_TIM_Base_Start_IT(&htim2);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -332,21 +338,6 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	  if (shouldClear) {
-		  lcdClear();
-		  shouldClear = FALSE;
-	  }
-
-	  if (mode == currentMeasurements) {
-		  SetTask(showCurrent);
-	  } else if (mode == maxMeasurements) {
-		  SetTask(showMax);
-	  } else if (mode == minMeasurements) {
-		  SetTask(showMin);
-	  } else {
-		  SetTask(showAvg);
-	  }
-
 	  TaskManager();
   }
   /* USER CODE END 3 */
