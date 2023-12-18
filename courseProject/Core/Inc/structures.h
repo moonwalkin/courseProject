@@ -13,13 +13,6 @@ struct Measurements {
 	float humidity;
 } measurements = {0.0, 0.0};
 
-typedef enum {
-	currentMeasurements,
-	maxMeasurements,
-	minMeasurements,
-	avgMeasurements,
-} Mode;
-
 struct State {
 	uint8_t timesClicked;
 } buttonState = {0};
