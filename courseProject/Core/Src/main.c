@@ -57,6 +57,7 @@ float humidities[ARRAY_SIZE];
 uint8_t currentIndex = 0;
 Mesure temperature = {0, 0, 0, 0};
 Mesure humidity = {0, 0, 0, 0};
+uint8_t arrayIsFull = FALSE;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -91,6 +92,8 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 }
 
 void calculateMaxAndMin() {
+	uint8_t size = 0;
+
 	temperature.max = temps[0];
 	temperature.min = temps[0];
 	temperature.sum = temps[0];
@@ -99,7 +102,13 @@ void calculateMaxAndMin() {
 	humidity.sum = humidities[0];
 	humidity.min = humidities[0];
 
-	for(int i = 1; i < currentIndex; i++) {
+	if (arrayIsFull) {
+		size = ARRAY_SIZE;
+	} else {
+		size = currentIndex;
+	}
+
+	for(int i = 1; i < size; i++) {
 		temperature.sum += temps[i];
 		humidity.sum += humidities[i];
 		if (temps[i] < temperature.min) {
@@ -115,8 +124,8 @@ void calculateMaxAndMin() {
 			humidity.min = humidities[i];
 		}
 	}
-	temperature.avg = temperature.sum / currentIndex;
-	humidity.avg = humidity.sum / currentIndex;
+	temperature.avg = temperature.sum / size;
+	humidity.avg = humidity.sum / size;
 }
 
 void showOnDisplay(float temp, float hum, char* tmpBuffer, char* tmpText, char* humBuffer, char* humText) {
@@ -217,6 +226,10 @@ void measure() {
 			temps[currentIndex] = measurements.temperature;
 			humidities[currentIndex] = measurements.humidity;
 			currentIndex = (currentIndex + 1) % 20;
+
+			if (currentIndex == ARRAY_SIZE - 1) {
+				arrayIsFull = TRUE;
+			}
 
 			if (buttonState.timesClicked == 0) {
 				SetTask(showCurrent);
